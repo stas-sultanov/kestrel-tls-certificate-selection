@@ -338,6 +338,13 @@ public static class TlsClientHelloParser
 			return TlsClientHelloParseErrorCode.ReadError;
 		}
 
+		// TLS 1.2 ClientHello.extensions allow 0 value
+		if (extensionsLength == 0)
+		{
+			// No extensions, return early with default values
+			return TlsClientHelloParseErrorCode.None;
+		}
+
 		// Subtract the processed field size from the remaining available bytes
 		dataLength -= 2;
 
