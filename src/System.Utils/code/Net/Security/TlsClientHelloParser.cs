@@ -109,12 +109,11 @@ public static class TlsClientHelloParser
 			return TlsClientHelloParseErrorCode.ReadError;
 		}
 
-		// Validate TLSPlaintext.type
-		// must be ContentType.handshake
+		// Validate TLSPlaintext.type, must be ContentType.handshake
 		if (type != ContentTypeHandshake)
 		{
 			handshakeLength = default;
-			return TlsClientHelloParseErrorCode.TLSPlaintextField_Type_IsInvalid;
+			return TlsClientHelloParseErrorCode.TLSPlaintext_Field_Type_IsInvalid;
 		}
 
 		// Skip TLSPlaintext.legacy_record_version, 2 bytes
@@ -126,12 +125,16 @@ public static class TlsClientHelloParser
 			return TlsClientHelloParseErrorCode.ReadError;
 		}
 
-		// Validate TLSPlaintext.length
-		// must be at least the Handshake header size to contain a valid Handshake message
-		// must not exceed the remaining bytes in the reader
-		if ((handshakeLength < HandshakeHeaderSize) || (handshakeLength > reader.Remaining))
+		// Validate TLSPlaintext.length, must be at least the Handshake header size
+		if (handshakeLength < HandshakeHeaderSize)
 		{
-			return TlsClientHelloParseErrorCode.TLSPlaintextField_Length_IsInvalid;
+			return TlsClientHelloParseErrorCode.TLSPlaintext_Field_Length_IsInvalid;
+		}
+
+		// Validate current data block
+		if (handshakeLength > reader.Remaining)
+		{
+			return TlsClientHelloParseErrorCode.TLSPlaintext_Body_IsMalformed;
 		}
 
 		return TlsClientHelloParseErrorCode.None;
@@ -163,12 +166,11 @@ public static class TlsClientHelloParser
 			return TlsClientHelloParseErrorCode.ReadError;
 		}
 
-		// Validate Handshake.msg_type
-		// must be HandshakeType.client_hello
+		// Validate Handshake.msg_type, must be HandshakeType.client_hello
 		if (handshakeType != HandshakeTypeClientHello)
 		{
 			clientHelloLength = default;
-			return TlsClientHelloParseErrorCode.Handshake_MessageType_IsInvalid;
+			return TlsClientHelloParseErrorCode.Handshake_Field_MessageType_IsInvalid;
 		}
 
 		// Read Handshake.length, 3 bytes
@@ -177,12 +179,16 @@ public static class TlsClientHelloParser
 			return TlsClientHelloParseErrorCode.ReadError;
 		}
 
-		// Validate Handshake.length
-		// must be at least the minimum size of TLS 1.2 ClientHello body (41 bytes)
-		// must not exceed the remaining bytes in the Handshake message
-		if ((clientHelloLength < 41) || (clientHelloLength > dataLength - HandshakeHeaderSize))
+		// Validate Handshake.length, must be at least 41 - the minimum size of TLS 1.2 ClientHello body
+		if (clientHelloLength < 41)
 		{
-			return TlsClientHelloParseErrorCode.Handshake_Length_IsInvalid;
+			return TlsClientHelloParseErrorCode.Handshake_Field_Length_IsInvalid;
+		}
+
+		// Validate current data block
+		if (clientHelloLength > dataLength - HandshakeHeaderSize)
+		{
+			return TlsClientHelloParseErrorCode.Handshake_Body_IsMalformed;
 		}
 
 		return TlsClientHelloParseErrorCode.None;
@@ -214,18 +220,24 @@ public static class TlsClientHelloParser
 			return TlsClientHelloParseErrorCode.ReadError;
 		}
 
+		// Validate ClientHello.legacy_session_id.length, must be less than or equal to 32
+		if (legacySessionIdLength > 32)
+		{
+			info = default;
+			return TlsClientHelloParseErrorCode.ClientHello_Field_LegacySessionId_Length_IsInvalid;
+		}
+
+		// Subtract the processed field size from the remaining available bytes
 		// Remaining available bytes in the ClientHello body after fixed fields and session ID
 		// 38 accounts for: 34 bytes already consumed (legacy_version + random), 1 byte just read (legacy_session_id.length),
 		// 2 bytes for the cipher_suites.length field, and 1 byte for the legacy_compression_methods.length field
 		var remainingLength = dataLength - 38 - legacySessionIdLength;
 
-		// Validate ClientHello.legacy_session_id.length
-		// must not be greater than 32
-		// must not exceed the available bytes in the ClientHello body
-		if (remainingLength < 0 || legacySessionIdLength > 32)
+		// Validate current data block
+		if (remainingLength < 0)
 		{
 			info = default;
-			return TlsClientHelloParseErrorCode.ClientHello_LegacySessionId_LengthIsInvalid;
+			return TlsClientHelloParseErrorCode.ClientHello_Body_IsMalformed;
 		}
 
 		// Skip ClientHello.legacy_session_id.data, length bytes
@@ -238,16 +250,21 @@ public static class TlsClientHelloParser
 			return TlsClientHelloParseErrorCode.ReadError;
 		}
 
+		// Validate ClientHello.cipher_suites.length, must be non-zero and a multiple of 2
+		if (cipherSuitesLength == 0 || (cipherSuitesLength % 2) != 0)
+		{
+			info = default;
+			return TlsClientHelloParseErrorCode.ClientHello_Field_CipherSuites_Length_IsInvalid;
+		}
+
 		// Subtract the processed field size from the remaining available bytes
 		remainingLength -= cipherSuitesLength;
 
-		// Validate ClientHello.cipher_suites.length
-		// must be non-zero and a multiple of 2, since each cipher suite is represented by 2 bytes
-		// must not exceed the available bytes in the ClientHello body
-		if (remainingLength < 0 || cipherSuitesLength == 0 || (cipherSuitesLength % 2) != 0)
+		// Validate data block
+		if (remainingLength < 0)
 		{
 			info = default;
-			return TlsClientHelloParseErrorCode.ClientHello_CipherSuites_LengthIsInvalid;
+			return TlsClientHelloParseErrorCode.ClientHello_Body_IsMalformed;
 		}
 
 		// Create a slice representing the cipher suites
@@ -263,16 +280,21 @@ public static class TlsClientHelloParser
 			return TlsClientHelloParseErrorCode.ReadError;
 		}
 
+		// Validate ClientHello.legacy_compression_methods.length, must be between 1 and 255
+		if (legacyCompressionMethodsLength < 1)
+		{
+			info = default;
+			return TlsClientHelloParseErrorCode.ClientHello_Field_LegacyCompressionMethods_Length_IsInvalid;
+		}
+
 		// Subtract the processed field size from the remaining available bytes
 		remainingLength -= legacyCompressionMethodsLength;
 
-		// Validate ClientHello.legacy_compression_methods.length
-		// must be between 1 and 255
-		// must not exceed the available bytes in the ClientHello body
-		if (remainingLength < 0 || legacyCompressionMethodsLength < 1)
+		// Validate current data block
+		if (remainingLength < 0)
 		{
 			info = default;
-			return TlsClientHelloParseErrorCode.ClientHello_LegacyCompressionMethods_LengthIsInvalid;
+			return TlsClientHelloParseErrorCode.ClientHello_Body_IsMalformed;
 		}
 
 		// Skip ClientHello.legacy_compression_methods.data, length bytes
@@ -343,7 +365,7 @@ public static class TlsClientHelloParser
 
 		if (extensionsLength != dataLength)
 		{
-			return TlsClientHelloParseErrorCode.ClientHello_Extensions_LengthIsInvalid;
+			return TlsClientHelloParseErrorCode.ClientHello_Field_Extensions_Length_IsInvalid;
 		}
 
 		// TLS 1.2 ClientHello.extensions allow 0 value
@@ -358,7 +380,7 @@ public static class TlsClientHelloParser
 		// must be exactly equal to the available bytes in the ClientHello.extensions block
 		if (extensionsLength < 8)
 		{
-			return TlsClientHelloParseErrorCode.ClientHello_Extensions_LengthIsInvalid;
+			return TlsClientHelloParseErrorCode.ClientHello_Field_Extensions_Length_IsInvalid;
 		}
 
 		// Read ClientHello.extensions.data
@@ -383,7 +405,7 @@ public static class TlsClientHelloParser
 			// must not exceed the available bytes in the extensions block
 			if (dataLength < 0)
 			{
-				return TlsClientHelloParseErrorCode.Extension_ExtensionData_LengthIsInvalid;
+				return TlsClientHelloParseErrorCode.Extension_Field_ExtensionData_Length_IsInvalid;
 			}
 
 			switch (extensionType)
@@ -443,21 +465,18 @@ public static class TlsClientHelloParser
 			return TlsClientHelloParseErrorCode.ReadError;
 		}
 
-		// Validate SignatureSchemeList.supported_signature_algorithms.length
-		// must be non-zero
-		// must be a multiple of 2, since each signature scheme is represented by 2 bytes
-		// must exactly match the available bytes for reading
+		// Validate SignatureSchemeList.supported_signature_algorithms.length, must be non-zero and a multiple of 2
 		if (supportedSignatureAlgorithmsLength == 0 || (supportedSignatureAlgorithmsLength % 2) != 0)
 		{
 			signatureAlgorithms = default;
-			return TlsClientHelloParseErrorCode.SignatureSchemeList_SupportedSignatureAlgorithms_LengthIsInvalid;
+			return TlsClientHelloParseErrorCode.SignatureSchemeList_Field_SupportedSignatureAlgorithms_Length_IsInvalid;
 		}
 
-		// Check if the declared length matches the actual available bytes for the signature algorithms list
+		// Validate data block
 		if ((2 + supportedSignatureAlgorithmsLength) != dataLength)
 		{
 			signatureAlgorithms = default;
-			return TlsClientHelloParseErrorCode.SignatureSchemeList_SupportedSignatureAlgorithms_DataIsMalformed;
+			return TlsClientHelloParseErrorCode.SignatureSchemeList_Body_IsMalformed;
 		}
 
 		// Create a slice representing the supported signature algorithms

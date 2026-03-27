@@ -8,12 +8,12 @@ namespace System.Net.Security;
 /// </summary>
 file static class ErrorCodeGroup
 {
-	public const Int32 Data               = 0x0100;
-	public const Int32 Record             = 0x0200;
-	public const Int32 Handshake          = 0x0300;
-	public const Int32 ClientHello        = 0x0400;
-	public const Int32 Extension          = 0x0500;
-	public const Int32 SignatureAlgorithm = 0x0600;
+	public const Int32 Data                = 0x0100;
+	public const Int32 Record              = 0x0200;
+	public const Int32 Handshake           = 0x0300;
+	public const Int32 ClientHello         = 0x0400;
+	public const Int32 Extension           = 0x0500;
+	public const Int32 SignatureSchemeList = 0x0600;
 }
 
 /// <summary>
@@ -32,7 +32,7 @@ public enum TlsClientHelloParseErrorCode
 	ReadError = 0x0001,
 
 	/// <summary>
-	/// The input data is empty, so there is no TLS record to parse.
+	/// The input data is empty.
 	/// </summary>
 	Data_IsEmpty = ErrorCodeGroup.Data | 0x01,
 
@@ -42,57 +42,72 @@ public enum TlsClientHelloParseErrorCode
 	Data_Length_IsInvalid = ErrorCodeGroup.Data | 0x02,
 
 	/// <summary>
-	/// The TLSPlaintext.length field value is invalid.
+	/// The TLSPlaintext structure is malformed.
 	/// </summary>
-	TLSPlaintextField_Length_IsInvalid = ErrorCodeGroup.Record | 0x01,
+	TLSPlaintext_Body_IsMalformed = ErrorCodeGroup.Record | 0x01,
 
 	/// <summary>
-	/// The TLSPlaintext.type field value is invalid.
+	/// The TLSPlaintext.type is invalid.
 	/// </summary>
-	TLSPlaintextField_Type_IsInvalid = ErrorCodeGroup.Record | 0x02,
+	TLSPlaintext_Field_Type_IsInvalid = ErrorCodeGroup.Record | 0x11,
 
 	/// <summary>
-	/// The Handshake.msg_type field value is invalid.
+	/// The TLSPlaintext.length is invalid.
 	/// </summary>
-	Handshake_MessageType_IsInvalid = ErrorCodeGroup.Handshake | 0x01,
+	TLSPlaintext_Field_Length_IsInvalid = ErrorCodeGroup.Record | 0x21,
 
 	/// <summary>
-	/// The Handshake.length field value is invalid.
+	/// The Handshake structure is malformed.
 	/// </summary>
-	Handshake_Length_IsInvalid = ErrorCodeGroup.Handshake | 0x02,
+	Handshake_Body_IsMalformed = ErrorCodeGroup.Handshake | 0x01,
+
+	/// <summary>
+	/// The Handshake.msg_type is invalid.
+	/// </summary>
+	Handshake_Field_MessageType_IsInvalid = ErrorCodeGroup.Handshake | 0x11,
+
+	/// <summary>
+	/// The Handshake.length is invalid.
+	/// </summary>
+	Handshake_Field_Length_IsInvalid = ErrorCodeGroup.Handshake | 0x21,
+
+	/// <summary>
+	/// The ClientHello structure is malformed.
+	/// </summary>
+	ClientHello_Body_IsMalformed = ErrorCodeGroup.ClientHello | 0x01,
 
 	/// <summary>
 	/// The ClientHello.legacy_session_id.length is invalid.
 	/// </summary>
-	ClientHello_LegacySessionId_LengthIsInvalid = ErrorCodeGroup.ClientHello | 0x01,
+	ClientHello_Field_LegacySessionId_Length_IsInvalid = ErrorCodeGroup.ClientHello | 0x11,
 
 	/// <summary>
 	/// The ClientHello.cipher_suites.length is invalid.
 	/// </summary>
-	ClientHello_CipherSuites_LengthIsInvalid = ErrorCodeGroup.ClientHello | 0x02,
+	ClientHello_Field_CipherSuites_Length_IsInvalid = ErrorCodeGroup.ClientHello | 0x21,
 
 	/// <summary>
 	/// The ClientHello.legacy_compression_methods.length is invalid.
 	/// </summary>
-	ClientHello_LegacyCompressionMethods_LengthIsInvalid = ErrorCodeGroup.ClientHello | 0x03,
+	ClientHello_Field_LegacyCompressionMethods_Length_IsInvalid = ErrorCodeGroup.ClientHello | 0x31,
 
 	/// <summary>
 	/// The ClientHello.extensions.length is invalid.
 	/// </summary>
-	ClientHello_Extensions_LengthIsInvalid = ErrorCodeGroup.ClientHello | 0x04,
+	ClientHello_Field_Extensions_Length_IsInvalid = ErrorCodeGroup.ClientHello | 0x41,
 
 	/// <summary>
 	/// The Extension.extension_data.length is invalid.
 	/// </summary>
-	Extension_ExtensionData_LengthIsInvalid = ErrorCodeGroup.Extension | 0x01,
+	Extension_Field_ExtensionData_Length_IsInvalid = ErrorCodeGroup.Extension | 0x11,
+
+	/// <summary>
+	/// The SignatureSchemeList structure is malformed.
+	/// </summary>
+	SignatureSchemeList_Body_IsMalformed = ErrorCodeGroup.SignatureSchemeList | 0x01,
 
 	/// <summary>
 	/// The SignatureSchemeList.supported_signature_algorithms.length is invalid.
 	/// </summary>
-	SignatureSchemeList_SupportedSignatureAlgorithms_LengthIsInvalid = ErrorCodeGroup.SignatureAlgorithm | 0x11,
-
-	/// <summary>
-	/// The SignatureSchemeList.supported_signature_algorithms.data is malformed.
-	/// </summary>
-	SignatureSchemeList_SupportedSignatureAlgorithms_DataIsMalformed = ErrorCodeGroup.SignatureAlgorithm | 0x12
+	SignatureSchemeList_Field_SupportedSignatureAlgorithms_Length_IsInvalid = ErrorCodeGroup.SignatureSchemeList | 0x11
 }
