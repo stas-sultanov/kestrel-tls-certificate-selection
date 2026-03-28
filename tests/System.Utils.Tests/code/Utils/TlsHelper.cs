@@ -245,6 +245,41 @@ internal static class TlsHelper
 	}
 
 	/// <summary>
+	/// Builds instance of SupportedVersions struct as bytes.
+	/// </summary>
+	/// <remarks>SupportedVersions struct defined in <see href="https://www.rfc-editor.org/rfc/rfc8446#section-4.2.1">RFC 8446 Section 4.2.1</see>.</remarks>
+	/// <param name="versions_length">versions.length field value.</param>
+	/// <param name="versions">versions field value.</param>
+	/// <returns>SupportedVersions struct.</returns>
+	public static Byte[] BuildSupportedVersions
+	(
+		Byte versions_length,
+		TlsProtocolVersion[] versions
+	)
+	{
+		// Actual size in bytes
+		var length = (Byte) (versions.Length * 2);
+
+		// Total result size: 1-byte length field + versions.
+		var extensionDataLength = (UInt16) (1 + length);
+		var result = new Byte[extensionDataLength];
+
+		var position = 0;
+
+		// SupportedVersions.versions.length
+		result[position++] = versions_length;
+
+		// SupportedVersions.versions.data
+		foreach (var version in versions)
+		{
+			result[position++] = (Byte) ((UInt16) version >> 8);
+			result[position++] = (Byte) version;
+		}
+
+		return result;
+	}
+
+	/// <summary>
 	/// Builds instance of TLSPlaintext struct as bytes.
 	/// </summary>
 	/// <remarks>TLSPlaintext struct defined in <see href="https://www.rfc-editor.org/rfc/rfc8446#section-5.1">RFC 8446 Section 5.1</see>.</remarks>

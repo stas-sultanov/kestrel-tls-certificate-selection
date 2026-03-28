@@ -14,6 +14,7 @@ file static class ErrorCodeGroup
 	public const Int32 ClientHello         = 0x0400;
 	public const Int32 Extension           = 0x0500;
 	public const Int32 SignatureSchemeList = 0x0600;
+	public const Int32 SupportedVersions   = 0x0700;
 }
 
 /// <summary>
@@ -114,5 +115,15 @@ public enum TlsClientHelloParseErrorCode
 	/// <summary>
 	/// The SignatureSchemeList.supported_signature_algorithms.length is invalid.
 	/// </summary>
-	SignatureSchemeList_Field_SupportedSignatureAlgorithms_Length_IsInvalid = ErrorCodeGroup.SignatureSchemeList | 0x11
+	SignatureSchemeList_Field_SupportedSignatureAlgorithms_Length_IsInvalid = ErrorCodeGroup.SignatureSchemeList | 0x11,
+
+	/// <summary>
+	/// The SupportedVersions structure is malformed.
+	/// </summary>
+	SupportedVersions_Body_IsMalformed = ErrorCodeGroup.SupportedVersions | 0x01,
+
+	/// <summary>
+	/// The SupportedVersions.versions.length is invalid.
+	/// </summary>
+	SupportedVersions_Field_Versions_Length_IsInvalid = ErrorCodeGroup.SupportedVersions | 0x11
 }

@@ -300,7 +300,7 @@ public static class TlsClientHelloParser
 		// Skip ClientHello.legacy_compression_methods.data, length bytes
 		reader.Advance(legacyCompressionMethodsLength);
 
-		ReadOnlySequence<Byte> signatureAlgorithms, signatureAlgorithmsCert;
+		ReadOnlySequence<Byte> signatureAlgorithms, signatureAlgorithmsCert, supportedVersions;
 
 		// According to TLS 1.2, ClientHello.extensions is optional
 		// If there are no bytes left to read, return the info with just the cipher suites
@@ -308,21 +308,20 @@ public static class TlsClientHelloParser
 		{
 			signatureAlgorithms = default;
 			signatureAlgorithmsCert = default;
+			supportedVersions = default;
 		}
 		else
 		{
 			// Process ClientHello.extensions
-			var result = TryProcessExtensions(ref reader, remainingLength, out signatureAlgorithms, out signatureAlgorithmsCert);
-
+			var result = TryProcessExtensions(ref reader, remainingLength, out signatureAlgorithms, out signatureAlgorithmsCert, out supportedVersions);
 			if (result != TlsClientHelloParseErrorCode.None)
 			{
 				info = default;
 				return result;
 			}
 		}
-
 		// Assign output
-		info = new TlsClientHelloInfo(cipherSuites, signatureAlgorithms, signatureAlgorithmsCert);
+		info = new TlsClientHelloInfo(cipherSuites, signatureAlgorithms, signatureAlgorithmsCert, supportedVersions);
 
 		return TlsClientHelloParseErrorCode.None;
 	}
@@ -335,24 +334,28 @@ public static class TlsClientHelloParser
 	/// <param name="dataLength">The number of bytes available for processing the ClientHello.extensions block.</param>
 	/// <param name="signatureAlgorithms">The raw bytes of the <c>signature_algorithms</c> extension payload, if present; otherwise, <c>default</c>.</param>
 	/// <param name="signatureAlgorithmsCert">The raw bytes of the <c>signature_algorithms_cert</c> extension payload, if present; otherwise, <c>default</c>.</param>
+	/// <param name="supportedVersions">The raw bytes of the <c>supported_versions</c> extension payload, if present; otherwise, <c>default</c>.</param>
 	/// <returns>A <see cref="TlsClientHelloParseErrorCode"/> indicating the result of the operation.</returns>
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	private static TlsClientHelloParseErrorCode TryProcessExtensions
 	(
-		scoped ref SequenceReader<Byte> reader,
-		Int32 dataLength,
-		out ReadOnlySequence<Byte> signatureAlgorithms,
-		out ReadOnlySequence<Byte> signatureAlgorithmsCert
+			scoped ref SequenceReader<Byte> reader,
+			Int32 dataLength,
+			out ReadOnlySequence<Byte> signatureAlgorithms,
+			out ReadOnlySequence<Byte> signatureAlgorithmsCert,
+			out ReadOnlySequence<Byte> supportedVersions
 	)
 	{
 		// ExtensionType.signature_algorithms enum value
 		const Int32 ExtensionTypeSignatureAlgorithms = 13;
 		// ExtensionType.signature_algorithms_cert enum value
 		const Int32 ExtensionTypeSignatureAlgorithmsCert = 50;
+		// ExtensionType.supported_versions enum value
+		const Int32 ExtensionTypeSupportedVersions = 43;
 
-		// Initialize output variables to default values
 		signatureAlgorithms = default;
 		signatureAlgorithmsCert = default;
+		supportedVersions = default;
 
 		// Read ClientHello.extensions.length, 2 bytes
 		if (!reader.TryReadBigEndian(out UInt16 extensionsLength))
@@ -376,8 +379,10 @@ public static class TlsClientHelloParser
 			return TlsClientHelloParseErrorCode.None;
 		}
 
-		// Validate ClientHello.extensions.length, must be between 8 and 65535
-		if (extensionsLength < 8)
+		// Validate ClientHello.extensions.length, must be at least large enough
+		// to contain a single empty Extension:
+		// extension_type(2) + extension_data.length(2) = 4 bytes.
+		if (extensionsLength < 4)
 		{
 			return TlsClientHelloParseErrorCode.ClientHello_Field_Extensions_Length_IsInvalid;
 		}
@@ -411,22 +416,33 @@ public static class TlsClientHelloParser
 			{
 				case ExtensionTypeSignatureAlgorithms:
 					{
-						var parseResult = TryProcessSignatureSchemeList(ref reader, extensionDataLength, out signatureAlgorithms);
-						if (parseResult != TlsClientHelloParseErrorCode.None)
+						var result = TryProcessSignatureSchemeList(ref reader, extensionDataLength, out signatureAlgorithms);
+
+						if (result != TlsClientHelloParseErrorCode.None)
 						{
-							signatureAlgorithmsCert = default;
-							return parseResult;
+							return result;
 						}
 
 						break;
 					}
 				case ExtensionTypeSignatureAlgorithmsCert:
 					{
-						var parseResult = TryProcessSignatureSchemeList(ref reader, extensionDataLength, out signatureAlgorithmsCert);
-						if (parseResult != TlsClientHelloParseErrorCode.None)
+						var result = TryProcessSignatureSchemeList(ref reader, extensionDataLength, out signatureAlgorithmsCert);
+
+						if (result != TlsClientHelloParseErrorCode.None)
 						{
-							signatureAlgorithms = default;
-							return parseResult;
+							return result;
+						}
+
+						break;
+					}
+				case ExtensionTypeSupportedVersions:
+					{
+						var result = TryProcessSupportedVersions(ref reader, extensionDataLength, out supportedVersions);
+
+						if (result != TlsClientHelloParseErrorCode.None)
+						{
+							return result;
 						}
 
 						break;
@@ -483,6 +499,52 @@ public static class TlsClientHelloParser
 
 		// Skip SignatureSchemeList.supported_signature_algorithms.data, length bytes
 		reader.Advance(supportedSignatureAlgorithmsLength);
+
+		return TlsClientHelloParseErrorCode.None;
+	}
+
+	/// <summary>
+	/// Tries to parse the given bytes as a SupportedVersions struct.
+	/// </summary>
+	/// <remarks>SupportedVersions struct defined in <see href="https://www.rfc-editor.org/rfc/rfc8446#section-4.2.1">RFC 8446 Section 4.2.1</see>.</remarks>
+	/// <param name="reader">The byte sequence reader.</param>
+	/// <param name="dataLength">The number of bytes available for processing the SupportedVersions structure.</param>
+	/// <param name="supportedVersions">The output slice of the supported versions bytes, if parsing is successful; otherwise, <c>default</c>.</param>
+	/// <returns>A <see cref="TlsClientHelloParseErrorCode"/> indicating the result of the operation.</returns>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	private static TlsClientHelloParseErrorCode TryProcessSupportedVersions
+	(
+		scoped ref SequenceReader<Byte> reader,
+		Int32 dataLength,
+		out ReadOnlySequence<Byte> supportedVersions
+	)
+	{
+		// Read SupportedVersions.versions.length, 1 byte
+		if (!reader.TryRead(out var versionsLength))
+		{
+			supportedVersions = default;
+			return TlsClientHelloParseErrorCode.ReadError;
+		}
+
+		// Validate SupportedVersions.versions.length, must be non-zero and a multiple of 2
+		if (versionsLength == 0 || (versionsLength % 2) != 0)
+		{
+			supportedVersions = default;
+			return TlsClientHelloParseErrorCode.SupportedVersions_Field_Versions_Length_IsInvalid;
+		}
+
+		// Validate data block
+		if ((1 + versionsLength) != dataLength)
+		{
+			supportedVersions = default;
+			return TlsClientHelloParseErrorCode.SupportedVersions_Body_IsMalformed;
+		}
+
+		// Create a slice representing the supported versions
+		supportedVersions = reader.UnreadSequence.Slice(0, versionsLength);
+
+		// Skip SupportedVersions.versions.data, length bytes
+		reader.Advance(versionsLength);
 
 		return TlsClientHelloParseErrorCode.None;
 	}

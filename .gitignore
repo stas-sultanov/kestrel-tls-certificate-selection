@@ -32,3 +32,4 @@
 
 # igore .dotnet directory which is used for global tools and SDKs
 .dotnet
+.nuget

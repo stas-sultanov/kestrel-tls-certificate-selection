@@ -177,10 +177,10 @@ public sealed class TlsClientHelloParserTests
 	}
 
 	[TestMethod]
-	public void TryParse_Fail_ClientHello_Field_Extensions_Length_IsInvalid_ValueIsLessThan8()
+	public void TryParse_Fail_ClientHello_Field_Extensions_Length_IsInvalid_ValueIsLessThan4()
 	{
-		// Minimum valid extensions length is 8 bytes, so use 6 to trigger validation failure.
-		var clientHello = TlsHelper.BuildClientHello(0x0303, 0, [], 2, [0, 0], 1, [0], 6, [0, 1, 2, 3, 4, 5, 6, 7]);
+		// Minimum valid extensions length is 4 bytes, so use 3 to trigger validation failure.
+		var clientHello = TlsHelper.BuildClientHello(0x0303, 0, [], 2, [0, 0], 1, [0], 3, [0, 1, 2]);
 		var expectedErrorCode = TlsClientHelloParseErrorCode.ClientHello_Field_Extensions_Length_IsInvalid;
 
 		TestTryParseClientHello(clientHello, expectedErrorCode, _ => true);
@@ -279,6 +279,45 @@ public sealed class TlsClientHelloParserTests
 
 	#endregion
 
+	#region Test Methods: Fail on Supported Versions
+
+	[TestMethod]
+	public void TryParse_Fail_SupportedVersions_Body_IsMalformed()
+	{
+		// length is 4 bytes, actual data is 2 bytes
+		var supportedVersions = TlsHelper.BuildSupportedVersions(4, [TlsProtocolVersion.Tls13]);
+		var extension = TlsHelper.BuildExtension(43, (UInt16) supportedVersions.Length, supportedVersions);
+		var clientHello = TlsHelper.BuildClientHelloTls13(extension);
+		var expectedErrorCode = TlsClientHelloParseErrorCode.SupportedVersions_Body_IsMalformed;
+
+		TestTryParseClientHello(clientHello, expectedErrorCode, _ => true);
+	}
+
+	[TestMethod]
+	public void TryParse_Fail_SupportedVersions_Field_Versions_Length_IsInvalid_Zero()
+	{
+		var supportedVersions = TlsHelper.BuildSupportedVersions(0, []);
+		var extension0 = TlsHelper.BuildExtension(43, (UInt16) supportedVersions.Length, supportedVersions);
+		// Filler extension to overcome < 8 bytes length check for extensions.
+		var extension1 = TlsHelper.BuildExtension(0, 8, [0, 1, 2, 3, 4, 5, 6, 7]);
+		var clientHello = TlsHelper.BuildClientHelloTls13([..extension1, ..extension0]);
+		var expectedErrorCode = TlsClientHelloParseErrorCode.SupportedVersions_Field_Versions_Length_IsInvalid;
+
+		TestTryParseClientHello(clientHello, expectedErrorCode, _ => true);
+	}
+
+	[TestMethod]
+	public void TryParse_Fail_SupportedVersions_Field_Versions_Length_IsInvalid_Odd()
+	{
+		var extension = TlsHelper.BuildExtension(43, 4, [0x03, 0x02, 0x01, 0x00]);
+		var clientHello = TlsHelper.BuildClientHelloTls13(extension);
+		var expectedErrorCode = TlsClientHelloParseErrorCode.SupportedVersions_Field_Versions_Length_IsInvalid;
+
+		TestTryParseClientHello(clientHello, expectedErrorCode, _ => true);
+	}
+
+	#endregion
+
 	#region Test Methods: Succeed
 
 	[TestMethod]
@@ -324,43 +363,61 @@ public sealed class TlsClientHelloParserTests
 	[TestMethod]
 	public void TryParse_Succeed_If_ClientHelloTls13_IsValidWithSignatureAlgorithms()
 	{
-		var expectedAuthenticationAlgorithms = new TlsSignatureScheme[]
+		var expectedSignatureAlgorithms = new TlsSignatureScheme[]
 		{
 			TlsSignatureScheme.rsa_pkcs1_sha256,
 			TlsSignatureScheme.ecdsa_secp521r1_sha512
 		};
-
-		var signatureScheme = TlsHelper.BuildSignatureSchemeList(4, Array.ConvertAll(expectedAuthenticationAlgorithms, value => (UInt16) value));
+		var signatureScheme = TlsHelper.BuildSignatureSchemeList(4, Array.ConvertAll(expectedSignatureAlgorithms, value => (UInt16) value));
 		var extension = TlsHelper.BuildExtension(0x000d, (UInt16) signatureScheme.Length, signatureScheme);
 		var clientHello = TlsHelper.BuildClientHelloTls13(extension);
 		var expectedErrorCode = TlsClientHelloParseErrorCode.None;
 
 		TestTryParseClientHello(clientHello, expectedErrorCode, info =>
 		{
-			var signatureSchemes = new TlsSignatureScheme[info.SignatureAlgorithmsCount];
+			Span<TlsSignatureScheme> signatureSchemes = stackalloc TlsSignatureScheme[info.SignatureAlgorithmsCount];
 			var copyResult = info.TryCopySignatureAlgorithms(signatureSchemes);
-			return signatureSchemes.SequenceEqual(expectedAuthenticationAlgorithms);
+			return signatureSchemes.SequenceEqual(expectedSignatureAlgorithms);
 		});
 	}
 
 	[TestMethod]
 	public void TryParse_Succeed_If_ClientHelloTls13_IsValidWithSignatureAlgorithmsCert()
 	{
-		var expectedAuthenticationAlgorithms = new TlsSignatureScheme[]
+		var expectedSignatureAlgorithmsCert = new TlsSignatureScheme[]
 		{
 			TlsSignatureScheme.ed25519, TlsSignatureScheme.rsa_pkcs1_sha384
 		};
-
-		var signatureScheme = TlsHelper.BuildSignatureSchemeList(4, Array.ConvertAll(expectedAuthenticationAlgorithms, value => (UInt16) value));
+		var signatureScheme = TlsHelper.BuildSignatureSchemeList(4, Array.ConvertAll(expectedSignatureAlgorithmsCert, value => (UInt16) value));
 		var extension = TlsHelper.BuildExtension(50, (UInt16) signatureScheme.Length, signatureScheme);
 		var clientHello = TlsHelper.BuildClientHelloTls13(extension);
 		var expectedErrorCode = TlsClientHelloParseErrorCode.None;
 
 		TestTryParseClientHello(clientHello, expectedErrorCode, info =>
 		{
-			var signatureSchemesCert = new TlsSignatureScheme[info.SignatureAlgorithmsCertCount];
+			Span<TlsSignatureScheme> signatureSchemesCert = stackalloc TlsSignatureScheme[info.SignatureAlgorithmsCertCount];
 			var copyResult = info.TryCopySignatureAlgorithmsCert(signatureSchemesCert);
-			return signatureSchemesCert.SequenceEqual(expectedAuthenticationAlgorithms);
+			return signatureSchemesCert.SequenceEqual(expectedSignatureAlgorithmsCert);
+		});
+	}
+
+	[TestMethod]
+	public void TryParse_Succeed_If_ClientHelloTls13_IsValidWithSupportedVersions()
+	{
+		var expectedSupportedVersions = new TlsProtocolVersion[]
+		{
+			TlsProtocolVersion.Tls12, TlsProtocolVersion.Tls13
+		};
+		var supportedVersions = TlsHelper.BuildSupportedVersions((Byte) (expectedSupportedVersions.Length*2), expectedSupportedVersions);
+		var extension = TlsHelper.BuildExtension(43, (UInt16) supportedVersions.Length, supportedVersions);
+		var clientHello = TlsHelper.BuildClientHelloTls13(extension);
+		var expectedErrorCode = TlsClientHelloParseErrorCode.None;
+
+		TestTryParseClientHello(clientHello, expectedErrorCode, info =>
+		{
+			Span<TlsProtocolVersion> supportedVersions = stackalloc TlsProtocolVersion[info.SupportedVersionsCount];
+			var copyResult = info.TryCopySupportedVersions(supportedVersions);
+			return supportedVersions.SequenceEqual(expectedSupportedVersions);
 		});
 	}
 
