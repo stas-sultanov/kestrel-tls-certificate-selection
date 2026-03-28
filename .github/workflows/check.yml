@@ -17,7 +17,9 @@ on:
       - tests/**
 
 permissions:
+  checks: write
   contents: read
+  pull-requests: write
 
 concurrency:
   group: check-${{ github.workflow }}-${{ github.ref }}
@@ -66,11 +68,12 @@ jobs:
       - name: Run Tests
         run: >-
           dotnet test ${{ env.TEST_PROJECT_PATH }}
+          --collect:"Code Coverage;Format=Cobertura"
           --configuration ${{ env.BUILD_CONFIGURATION }}
           --no-build
-          --verbosity ${{ env.DOTNET_VERBOSITY }}
           --logger "trx;LogFileName=test-results.trx"
           --results-directory ${{ env.TESTS_RESULTS_DIRECTORY_NAME }}
+          --verbosity ${{ env.DOTNET_VERBOSITY }}
 
       - name: Upload Test Results
         if: always()
@@ -79,3 +82,21 @@ jobs:
           name: test-results
           path: ${{ env.TESTS_RESULTS_DIRECTORY_NAME }}/**/*.trx
           if-no-files-found: error
+
+      - name: Convert Coverage Report to Markdown
+        if: always()
+        uses: irongut/CodeCoverageSummary@51cc3a756ddcd398d447c044c02cb6aa83fdae95 #v1.3.0
+        with:
+          badge: true
+          filename: "${{ env.TESTS_RESULTS_DIRECTORY_NAME }}/*/*.cobertura.xml"
+          format: markdown
+          output: file
+          thresholds: "70 75"
+
+      - name: Add Coverage Report to PR
+        if: always() && github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@52423e01640425a022ef5fd42c6fb5f633a02728 #v2.9.1
+        with:
+          header: Code Coverage
+          recreate: true
+          path: code-coverage-results.md
