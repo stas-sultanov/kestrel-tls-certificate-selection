@@ -1,7 +1,7 @@
 # TLS Server Certificate Selection
 
-This repository contains source code for types that parse a TLS `ClientHello` message.<br>
-These types can be used by any .NET web server to select a server certificate during the TLS handshake based on the client's advertised capabilities, such as supported signature algorithms.
+This repository contains a .NET TLS `ClientHello` parser for server certificate selection during the TLS handshake.
+The parser is web-server agnostic and can be used by any .NET server to choose a compatible certificate based on the client's advertised capabilities, such as supported signature algorithms.
 
 The types are designed to support TLS 1.2 and TLS 1.3, as defined by [RFC 5246][rfc_5246] and [RFC 8446][rfc_8446].
 
