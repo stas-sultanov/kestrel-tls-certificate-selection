@@ -186,7 +186,7 @@ public static class TlsClientHelloParser
 		}
 
 		// Validate current data block
-		if (clientHelloLength > dataLength - HandshakeHeaderSize)
+		if (clientHelloLength != dataLength - HandshakeHeaderSize)
 		{
 			return TlsClientHelloParseErrorCode.Handshake_Body_IsMalformed;
 		}

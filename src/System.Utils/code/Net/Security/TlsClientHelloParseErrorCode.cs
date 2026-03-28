@@ -103,11 +103,6 @@ public enum TlsClientHelloParseErrorCode
 	Extension_Body_IsMalformed = ErrorCodeGroup.Extension | 0x01,
 
 	/// <summary>
-	/// The Extension.extension_data.length is invalid.
-	/// </summary>
-	Extension_Field_ExtensionData_Length_IsInvalid = ErrorCodeGroup.Extension | 0x11,
-
-	/// <summary>
 	/// The SignatureSchemeList structure is malformed.
 	/// </summary>
 	SignatureSchemeList_Body_IsMalformed = ErrorCodeGroup.SignatureSchemeList | 0x01,
