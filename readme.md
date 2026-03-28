@@ -1,5 +1,8 @@
 # TLS Server Certificate Selection
 
+[![CodeQL](https://github.com/stas-sultanov/tls-server-certificate-selection/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/stas-sultanov/tls-server-certificate-selection/actions/workflows/github-code-scanning/codeql)
+[![Check](https://github.com/stas-sultanov/tls-server-certificate-selection/actions/workflows/check.yml/badge.svg)](https://github.com/stas-sultanov/tls-server-certificate-selection/actions/workflows/check.yml)
+
 This repository contains a .NET TLS `ClientHello` parser for server certificate selection during the TLS handshake.
 The parser is web-server agnostic and can be used by any .NET server to choose a compatible certificate based on the client's advertised capabilities, such as supported signature algorithms.
 
@@ -56,6 +59,8 @@ The integration tests use Kestrel because it exposes two APIs that make this flo
 
 ## Running Tests
 
+The [Check][github_workflow_check] workflow restores, builds, and runs all tests automatically on GitHub Actions.
+
 To build the project and run the tests on Windows:
 
 - Install WSL with a Linux distribution.
@@ -73,6 +78,7 @@ To build the project and run the tests on Windows:
 [ms_learn_tlsclienthellobytescallback]: https://learn.microsoft.com/en-us/dotnet/api/microsoft.aspnetcore.server.kestrel.https.httpsconnectionadapteroptions.tlsclienthellobytescallback?view=aspnetcore-10.0
 [ms_learn_servercertificateselector]: https://learn.microsoft.com/en-us/dotnet/api/microsoft.aspnetcore.server.kestrel.https.httpsconnectionadapteroptions.servercertificateselector?view=aspnetcore-10.0
 [ms_learn_ConnectionContext]: https://learn.microsoft.com/en-us/dotnet/api/microsoft.aspnetcore.connections.connectioncontext?view=aspnetcore-10.0
+[github_workflow_check]: https://github.com/stas-sultanov/tls-server-certificate-selection/actions/workflows/check.yml
 
 [code_TlsClientHelloParser]: ./src/System.Utils/code/Net/Security/TlsClientHelloParser.cs
 [code_TlsSignatureScheme]: ./src/System.Utils/code/Net/Security/TlsSignatureScheme.cs

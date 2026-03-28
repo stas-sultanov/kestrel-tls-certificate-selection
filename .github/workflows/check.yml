@@ -1,0 +1,81 @@
+name: Check
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/check.yml
+      - src/**
+      - tests/**
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/check.yml
+      - src/**
+      - tests/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BUILD_CONFIGURATION: Release
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_VERBOSITY: minimal
+  MAIN_PROJECT_PATH: src/System.Utils/System.Utils.csproj
+  TEST_PROJECT_PATH: tests/System.Utils.Tests/System.Utils.Tests.csproj
+  TESTS_RESULTS_DIRECTORY_NAME: TestResults
+
+jobs:
+  test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            src/System.Utils/System.Utils.csproj
+            tests/System.Utils.Tests/System.Utils.Tests.csproj
+
+      - name: Restore
+        run: >-
+          dotnet restore ${{ env.TEST_PROJECT_PATH }}
+          --verbosity ${{ env.DOTNET_VERBOSITY }}
+
+      - name: Build
+        run: >-
+          dotnet build ${{ env.MAIN_PROJECT_PATH }}
+          --configuration ${{ env.BUILD_CONFIGURATION }}
+          --no-restore
+          --verbosity ${{ env.DOTNET_VERBOSITY }}
+
+      - name: Run Tests
+        run: >-
+          dotnet test ${{ env.TEST_PROJECT_PATH }}
+          --configuration ${{ env.BUILD_CONFIGURATION }}
+          --no-build
+          --verbosity ${{ env.DOTNET_VERBOSITY }}
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory ${{ env.TESTS_RESULTS_DIRECTORY_NAME }}
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ${{ env.TESTS_RESULTS_DIRECTORY_NAME }}/**/*.trx
+          if-no-files-found: error
