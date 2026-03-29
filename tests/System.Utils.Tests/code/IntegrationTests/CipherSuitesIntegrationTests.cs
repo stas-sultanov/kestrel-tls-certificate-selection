@@ -14,6 +14,7 @@ using System.Security.Cryptography.X509Certificates;
 /// Integration tests for TLS cipher suite certificate selection.
 /// </summary>
 [SupportedOSPlatform("linux")]
+[TestCategory("Integration")]
 [TestClass]
 public sealed class CipherSuitesIntegrationTests
 {
