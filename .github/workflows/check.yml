@@ -17,89 +17,136 @@ on:
       - tests/**
   workflow_dispatch:
 
-permissions:
-  checks: write
-  contents: read
-  pull-requests: write
-
-concurrency:
-  group: check-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 env:
-  BUILD_CONFIGURATION: Release
+  # Specifies whether data about the .NET tools usage is collected and sent to Microsoft.
+  DOTNET_CLI_TELEMETRY_OPTOUT: false
+  # Controls diagnostics tracing from the hosting components.
+  DOTNET_HOST_TRACE: 0
+  # Controls the verbosity of diagnostics tracing from the hosting components.
+  DOTNET_HOST_TRACE_VERBOSITY: 4
+  # Specifies whether .NET welcome and telemetry messages are displayed on the first run.
   DOTNET_NOLOGO: true
-  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
-  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  # Verbosity level for dotnet command
   DOTNET_VERBOSITY: minimal
-  MAIN_PROJECT_PATH: src/System.Utils/System.Utils.csproj
-  TEST_PROJECT_PATH: tests/System.Utils.Tests/System.Utils.Tests.csproj
-  TESTS_RESULTS_DIRECTORY_NAME: TestResults
+  # Name of the shared tests artifact
+  TESTS_ARTIFACT_NAME: tests
 
 jobs:
-  test:
-    name: Build and Test
+
+  build:
+
+    env:
+      # Name of the configuration to build.
+      BUILD_CONFIGURATION_NAME: Release
+      # Path to the project file
+      MAIN_PROJECT_FILE_PATH: src/System.Utils/System.Utils.csproj
+      # Path to the tests project file
+      TESTS_PROJECT_FILE_PATH: tests/System.Utils.Tests/System.Utils.Tests.csproj
+      # Path to the test project publish directory.
+      TESTS_PROJECT_PUBLISH_DIRECTORY_PATH: out
+
+    name: Build
+
+    permissions:
+      # Required to checkout the repo
+      contents: read
+
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    - name: Checkout
+      uses: actions/checkout@v6
 
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
-          cache: true
-          cache-dependency-path: |
-            src/System.Utils/System.Utils.csproj
-            tests/System.Utils.Tests/System.Utils.Tests.csproj
+    - name: Setup .NET 10
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: 10.0.x
 
-      - name: Restore
-        run: >-
-          dotnet restore --project ${{ env.TEST_PROJECT_PATH }}
-          --verbosity ${{ env.DOTNET_VERBOSITY }}
+    - name: Restore
+      run: >-
+        dotnet restore --project ${{ env.MAIN_PROJECT_FILE_PATH }}
 
-      - name: Build
-        run: >-
-          dotnet build ${{ env.MAIN_PROJECT_PATH }}
-          --configuration ${{ env.BUILD_CONFIGURATION }}
-          --no-restore
-          --verbosity ${{ env.DOTNET_VERBOSITY }}
+    - name: Build Main
+      run: >-
+        dotnet build ${{ env.MAIN_PROJECT_FILE_PATH }}
+        --configuration ${{ env.BUILD_CONFIGURATION_NAME }}
+        --no-restore
 
-      - name: Run Tests
-        run: >-
-          dotnet test --project ${{ env.TEST_PROJECT_PATH }}
-          --configuration ${{ env.BUILD_CONFIGURATION }}
-          --no-build
-          --coverage
-          --coverage-output-format cobertura
-          --report-trx
-          --report-trx-filename test-results.trx
-          --results-directory ${{ env.TESTS_RESULTS_DIRECTORY_NAME }}
-          --verbosity ${{ env.DOTNET_VERBOSITY }}
+    - name: Publish Tests
+      run: >-
+        dotnet publish ${{ env.TESTS_PROJECT_FILE_PATH }}
+        --configuration ${{ env.BUILD_CONFIGURATION_NAME }}
+        --runtime linux-x64
+        --self-contained false
+        --output ${{ env.TESTS_PROJECT_PUBLISH_DIRECTORY_PATH }}
 
-      - name: Upload Test Results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: ${{ env.TESTS_RESULTS_DIRECTORY_NAME }}/**/*.trx
-          if-no-files-found: error
+    - name: Upload Tests
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ env.TESTS_ARTIFACT_NAME }}
+        path: ${{ env.TESTS_PROJECT_PUBLISH_DIRECTORY_PATH }}
 
-      - name: Convert Coverage Report to Markdown
-        if: always()
-        uses: irongut/CodeCoverageSummary@51cc3a756ddcd398d447c044c02cb6aa83fdae95 #v1.3.0
-        with:
-          badge: true
-          filename: "${{ env.TESTS_RESULTS_DIRECTORY_NAME }}/*/*.cobertura.xml"
-          format: markdown
-          output: file
-          thresholds: "70 75"
+  runUnitTests:
 
-      - name: Add Coverage Report to PR
-        if: always() && github.event_name == 'pull_request'
-        uses: marocchino/sticky-pull-request-comment@52423e01640425a022ef5fd42c6fb5f633a02728 #v2.9.1
-        with:
-          header: Code Coverage
-          recreate: true
-          path: code-coverage-results.md
+    env:
+      # Path to the test results directory relative to the root of the project.
+      TESTS_RESULTS_DIRECTORY_NAME: testsResults
+
+    name: Run Unit Tests
+
+    needs: build
+
+    permissions:
+      # Required by [EnricoMi/publish-unit-test-result-action]
+      checks: write
+      # Required by [EnricoMi/publish-unit-test-result-action, marocchino/sticky-pull-request-comment]
+      pull-requests: write
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Setup .NET 10
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+      env:
+        DOTNET_NOLOGO: true
+
+    - name: Download Build
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ env.TESTS_ARTIFACT_NAME }}
+
+    - name: Run Tests
+      run: >-
+        dotnet test ./System.Utils.Tests.dll
+        --collect:"Code Coverage;Format=Cobertura"
+        --filter TestCategory=UnitTests
+        --logger:"trx"
+        --results-directory ${{ env.TESTS_RESULTS_DIRECTORY_NAME }}
+
+    - name: Publish Result
+      uses: EnricoMi/publish-unit-test-result-action@170bf24d20d201b842d7a52403b73ed297e6645b #v2.18.0
+      with:
+        check_name: Unit Tests
+        check_run: false # feature does not work well like at all
+        files: |
+          ${{ env.TESTS_RESULTS_DIRECTORY_NAME }}/*.trx
+
+    - name: Convert Coverage Report to Markdown
+      uses: irongut/CodeCoverageSummary@51cc3a756ddcd398d447c044c02cb6aa83fdae95 #v1.3.0
+      with:
+        badge: true
+        filename: '${{ env.TESTS_RESULTS_DIRECTORY_NAME }}/*/*.cobertura.xml'
+        format: markdown
+        output: file
+        thresholds: '70 75'
+
+    - name: Add Coverage Report to PR
+      uses: marocchino/sticky-pull-request-comment@52423e01640425a022ef5fd42c6fb5f633a02728 #v2.9.1
+      if: github.event_name == 'pull_request'
+      with:
+        header: Unit Tests
+        recreate: true
+        path: code-coverage-results.md
