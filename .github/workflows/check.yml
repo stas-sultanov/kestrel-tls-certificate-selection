@@ -23,11 +23,9 @@ env:
   # Controls diagnostics tracing from the hosting components.
   DOTNET_HOST_TRACE: 0
   # Controls the verbosity of diagnostics tracing from the hosting components.
-  DOTNET_HOST_TRACE_VERBOSITY: 4
+  DOTNET_HOST_TRACE_VERBOSITY: 1
   # Specifies whether .NET welcome and telemetry messages are displayed on the first run.
   DOTNET_NOLOGO: true
-  # Verbosity level for dotnet command
-  DOTNET_VERBOSITY: minimal
   # Name of the shared tests artifact
   TESTS_ARTIFACT_NAME: tests
 
@@ -39,7 +37,7 @@ jobs:
       # Name of the configuration to build.
       BUILD_CONFIGURATION_NAME: Release
       # Runtime identifier to build for.
-      DOTNET_BULD_RUNTIME_ID: linux-x64
+      DOTNET_BUILD_RUNTIME_ID: linux-x64
       # Path to the project file
       MAIN_PROJECT_FILE_PATH: src/System.Utils/System.Utils.csproj
       # Path to the tests project file
@@ -67,21 +65,21 @@ jobs:
     - name: Restore
       run: >-
         dotnet restore ${{ env.TESTS_PROJECT_FILE_PATH }}
-        --runtime ${{ env.DOTNET_BULD_RUNTIME_ID }}
+        --runtime ${{ env.DOTNET_BUILD_RUNTIME_ID }}
 
     - name: Build Main
       run: >-
         dotnet build ${{ env.MAIN_PROJECT_FILE_PATH }}
         --configuration ${{ env.BUILD_CONFIGURATION_NAME }}
         --no-restore
-        --runtime ${{ env.DOTNET_BULD_RUNTIME_ID }}
+        --runtime ${{ env.DOTNET_BUILD_RUNTIME_ID }}
 
     - name: Publish Tests
       run: >-
         dotnet publish ${{ env.TESTS_PROJECT_FILE_PATH }}
         --configuration ${{ env.BUILD_CONFIGURATION_NAME }}
         --no-restore
-        --runtime ${{ env.DOTNET_BULD_RUNTIME_ID }}
+        --runtime ${{ env.DOTNET_BUILD_RUNTIME_ID }}
         --self-contained false
         --output ${{ env.TESTS_PROJECT_PUBLISH_DIRECTORY_PATH }}
 
@@ -132,7 +130,7 @@ jobs:
         --results-directory ${{ env.TESTS_RESULTS_DIRECTORY_NAME }}
 
     - name: Publish Result
-      uses: EnricoMi/publish-unit-test-result-action@170bf24d20d201b842d7a52403b73ed297e6645b #v2.18.0
+      uses: EnricoMi/publish-unit-test-result-action@c950f6fb443cb5af20a377fd0dfaa78838901040 #v2.23.0
       with:
         check_name: Unit Tests
         check_run: false # feature does not work well like at all

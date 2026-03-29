@@ -8,6 +8,7 @@ using System.Buffers;
 /// <summary>
 /// Unit tests for <see cref="SequenceReaderExtensions"/> methods that read unsigned integers.
 /// </summary>
+[TestCategory("UnitTests")]
 [TestClass]
 public sealed class SequenceReaderAdvanceExtensionsTests
 {
