@@ -64,7 +64,7 @@ jobs:
 
     - name: Restore
       run: >-
-        dotnet restore --project ${{ env.MAIN_PROJECT_FILE_PATH }}
+        dotnet restore ${{ env.TESTS_PROJECT_FILE_PATH }}
 
     - name: Build Main
       run: >-
@@ -76,6 +76,7 @@ jobs:
       run: >-
         dotnet publish ${{ env.TESTS_PROJECT_FILE_PATH }}
         --configuration ${{ env.BUILD_CONFIGURATION_NAME }}
+        --no-restore
         --runtime linux-x64
         --self-contained false
         --output ${{ env.TESTS_PROJECT_PUBLISH_DIRECTORY_PATH }}
