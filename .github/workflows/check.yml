@@ -112,14 +112,14 @@ jobs:
     steps:
 
     - name: Setup .NET 10
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
       env:
         DOTNET_NOLOGO: true
 
     - name: Download Build
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: ${{ env.TESTS_ARTIFACT_NAME }}
 
@@ -149,7 +149,7 @@ jobs:
         thresholds: '70 75'
 
     - name: Add Coverage Report to PR
-      uses: marocchino/sticky-pull-request-comment@52423e01640425a022ef5fd42c6fb5f633a02728 #v2.9.1
+      uses: marocchino/sticky-pull-request-comment@70d2764d1a7d5d9560b100cbea0077fc8f633987 #v3.0.2
       if: github.event_name == 'pull_request'
       with:
         header: Unit Tests
@@ -169,7 +169,7 @@ jobs:
     permissions:
       # Required by [EnricoMi/publish-unit-test-result-action]
       checks: write
-      # Required by [EnricoMi/publish-unit-test-result-action, marocchino/sticky-pull-request-comment]
+      # Required by [EnricoMi/publish-unit-test-result-action]
       pull-requests: write
 
     runs-on: ubuntu-latest
@@ -177,14 +177,14 @@ jobs:
     steps:
 
     - name: Setup .NET 10
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
       env:
         DOTNET_NOLOGO: true
 
     - name: Download Build
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: ${{ env.TESTS_ARTIFACT_NAME }}
 
